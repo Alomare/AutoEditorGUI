@@ -1,0 +1,22 @@
+Third-party software in this package
+====================================
+
+bin\auto-editor.exe  (auto-editor {{AE_VERSION}})
+  Unmodified release binary from https://github.com/WyattBlue/auto-editor/releases
+  auto-editor's source code is released into the public domain under the
+  Unlicense (https://unlicense.org). The binary statically links FFmpeg and
+  other libraries (for example codec and transcription libraries), which are
+  covered by their own open-source licenses (such as LGPL/GPL). See the
+  auto-editor repository for the exact components, their licenses and the
+  build scripts used to produce the binary.
+
+AutoEditorGUI.exe is built with these open-source libraries, among others:
+  Tauri (MIT or Apache-2.0)          https://tauri.app
+  Svelte / SvelteKit (MIT)           https://svelte.dev
+  Lucide icons (ISC)                 https://lucide.dev
+  reqwest, serde, tokio and other Rust crates (MIT or Apache-2.0)
+
+Downloaded on request (not included in this package):
+  yt-dlp (Unlicense)                 https://github.com/yt-dlp/yt-dlp
+  whisper.cpp ggml models (MIT)      https://huggingface.co/ggerganov/whisper.cpp
+  Parakeet TDT models (CC-BY-4.0)    https://huggingface.co/ggml-org/parakeet-GGUF
