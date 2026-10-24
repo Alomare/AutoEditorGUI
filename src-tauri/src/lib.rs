@@ -3,7 +3,10 @@ mod download;
 mod paths;
 mod process;
 
+use std::io::Read;
 use std::path::{Path, PathBuf};
+use std::process::Stdio;
+use std::time::{Duration, Instant};
 
 use serde::Serialize;
 use tauri::{Manager, RunEvent};
@@ -29,9 +32,12 @@ fn app_info(paths: tauri::State<'_, AppPaths>) -> AppInfo {
         os: std::env::consts::OS,
         arch: std::env::consts::ARCH,
         paths: paths.inner().clone(),
-        launch_files: std::env::args()
+        // args_os: `args()` panics on a file name that isn't valid Unicode.
+        launch_files: std::env::args_os()
             .skip(1)
-            .filter(|a| Path::new(a).is_file())
+            .map(PathBuf::from)
+            .filter(|p| p.is_file())
+            .map(|p| p.to_string_lossy().into_owned())
             .collect(),
     }
 }
@@ -59,10 +65,34 @@ fn locate(paths: &AppPaths, name: &str, custom: Option<&str>) -> Option<(PathBuf
 
 fn tool_version(path: &Path) -> Option<String> {
     let mut cmd = std::process::Command::new(path);
-    cmd.arg("--version");
+    cmd.arg("--version")
+        .stdin(Stdio::null())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::null());
     process::hide_window(&mut cmd);
-    let out = cmd.output().ok()?;
-    let text = String::from_utf8_lossy(&out.stdout);
+    let mut child = cmd.spawn().ok()?;
+    let mut stdout = child.stdout.take()?;
+    let reader = std::thread::spawn(move || {
+        let mut bytes = Vec::new();
+        let _ = stdout.read_to_end(&mut bytes);
+        bytes
+    });
+    // A wrong custom path (say, some GUI program) may never exit; startup
+    // waits on this, so give up instead of hanging.
+    let deadline = Instant::now() + Duration::from_secs(10);
+    loop {
+        match child.try_wait() {
+            Ok(Some(_)) => break,
+            Ok(None) if Instant::now() < deadline => std::thread::sleep(Duration::from_millis(50)),
+            _ => {
+                let _ = child.kill();
+                let _ = child.wait();
+                return None;
+            }
+        }
+    }
+    let bytes = reader.join().ok()?;
+    let text = String::from_utf8_lossy(&bytes);
     text.lines().map(str::trim).find(|l| !l.is_empty()).map(String::from)
 }
 

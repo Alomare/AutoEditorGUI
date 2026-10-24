@@ -5,10 +5,12 @@ import { videoDir } from '@tauri-apps/api/path';
 
 import * as backend from './backend';
 import type { AppInfo, MediaInfo, ToolInfo } from './backend';
+import { TIMELINE_EXTENSIONS } from './catalog';
 import { BUILTIN_PRESETS, type Preset } from './presets';
 import {
   clone,
   defaultSettings,
+  extOf,
   joinPath,
   normalizeSettings,
   uid,
@@ -113,6 +115,12 @@ class AppState {
 
   loaded = false;
   private saveTimer: ReturnType<typeof setTimeout> | null = null;
+  private unsaved: SavedFile | null = null;
+  /** In-flight `auto-editor info` calls, by path, and a cap on how many run
+   *  at once (adding a folder of 100 files shouldn't start 100 processes). */
+  private infoLoads = new Map<string, Promise<MediaInfo | null>>();
+  private infoRunning = 0;
+  private infoWaiting: (() => void)[] = [];
 
   get settingsPath(): string {
     return this.info ? joinPath(this.info.paths.data, 'settings.json') : '';
@@ -132,8 +140,9 @@ class AppState {
   async load() {
     this.info = await backend.appInfo();
     this.videosDir = await videoDir().catch(() => '');
+    let text: string | null = null;
     try {
-      const text = await backend.readText(this.settingsPath);
+      text = await backend.readText(this.settingsPath);
       if (text) {
         const saved = JSON.parse(text) as Partial<SavedFile>;
         this.prefs = { ...defaultPrefs(), ...(saved.prefs ?? {}) };
@@ -142,7 +151,14 @@ class AppState {
         this.userPresets = (saved.presets ?? []).map((p) => ({ ...p, builtin: false, settings: normalizeSettings(p.settings) }));
       }
     } catch (e) {
-      this.notify(`Settings file couldn't be read, starting fresh (${backend.errorText(e)})`, 'error');
+      // The next save overwrites settings.json, so keep a copy of the
+      // unreadable one; the user's presets may be recoverable from it.
+      let kept = '';
+      if (text) {
+        const copy = joinPath(this.info.paths.data, `settings.broken-${Date.now()}.json`);
+        kept = await backend.writeText(copy, text).then(() => `; the old file was kept as ${copy}`, () => '');
+      }
+      this.notify(`Settings file couldn't be read, starting fresh (${backend.errorText(e)})${kept}`, 'error');
     }
     this.loaded = true;
     await this.refreshTools();
@@ -152,7 +168,7 @@ class AppState {
   /** Debounced save; called from an $effect watching the persisted state. */
   scheduleSave() {
     if (!this.loaded) return;
-    const snapshot: SavedFile = {
+    this.unsaved = {
       version: 1,
       prefs: clone(this.prefs),
       settings: clone(this.settings),
@@ -160,11 +176,21 @@ class AppState {
       presets: clone(this.userPresets),
     };
     if (this.saveTimer) clearTimeout(this.saveTimer);
-    this.saveTimer = setTimeout(() => {
-      backend.writeText(this.settingsPath, JSON.stringify(snapshot, null, 2)).catch((e) => {
-        this.notify(`Couldn't save settings: ${backend.errorText(e)}`, 'error');
-      });
-    }, 400);
+    this.saveTimer = setTimeout(() => void this.flushSave(), 400);
+  }
+
+  /** Write a pending save now (also used when the window closes). */
+  async flushSave() {
+    if (this.saveTimer) clearTimeout(this.saveTimer);
+    this.saveTimer = null;
+    const snapshot = this.unsaved;
+    if (!snapshot) return;
+    this.unsaved = null;
+    try {
+      await backend.writeText(this.settingsPath, JSON.stringify(snapshot, null, 2));
+    } catch (e) {
+      this.notify(`Couldn't save settings: ${backend.errorText(e)}`, 'error');
+    }
   }
 
   async refreshTools() {
@@ -175,6 +201,8 @@ class AppState {
     this.autoEditor = ae;
     this.ytdlp = yt;
     this.toolsChecked = true;
+    // Files added before auto-editor was set up still need their info.
+    if (ae) for (const i of this.inputs) if (i.kind === 'file') void this.loadInfo(i.value);
   }
 
   notify(text: string, kind: 'info' | 'error' | 'success' = 'info') {
@@ -208,18 +236,39 @@ class AppState {
     this.inputs = this.inputs.filter((i) => i.id !== id);
   }
 
-  async loadInfo(path: string, force = false): Promise<MediaInfo | null> {
-    if (!force && path in this.mediaInfo) return this.mediaInfo[path];
-    if (!this.autoEditor) return null;
-    try {
-      const r = await backend.runCapture(this.autoEditor.path, ['info', '--json', path]);
-      const parsed = JSON.parse(r.stdout) as Record<string, MediaInfo>;
-      const info = parsed[path] ?? Object.values(parsed)[0] ?? null;
+  loadInfo(path: string, force = false): Promise<MediaInfo | null> {
+    if (!force && path in this.mediaInfo) return Promise.resolve(this.mediaInfo[path]);
+    const inflight = this.infoLoads.get(path);
+    if (inflight) return inflight;
+    // Timelines aren't media; the input list describes them without info.
+    if (!this.autoEditor || TIMELINE_EXTENSIONS.includes(extOf(path))) return Promise.resolve(null);
+    const ae = this.autoEditor.path;
+    delete this.mediaInfo[path]; // back to "Reading…" on a retry
+    const load = this.withInfoSlot(async () => {
+      try {
+        const r = await backend.runCapture(ae, ['info', '--json', path]);
+        const parsed = JSON.parse(r.stdout) as Record<string, MediaInfo>;
+        return parsed[path] ?? Object.values(parsed)[0] ?? null;
+      } catch {
+        return null;
+      }
+    }).then((info) => {
       this.mediaInfo[path] = info;
+      this.infoLoads.delete(path);
       return info;
-    } catch {
-      this.mediaInfo[path] = null;
-      return null;
+    });
+    this.infoLoads.set(path, load);
+    return load;
+  }
+
+  private async withInfoSlot<T>(f: () => Promise<T>): Promise<T> {
+    while (this.infoRunning >= 3) await new Promise<void>((resolve) => this.infoWaiting.push(resolve));
+    this.infoRunning++;
+    try {
+      return await f();
+    } finally {
+      this.infoRunning--;
+      this.infoWaiting.shift()?.();
     }
   }
 

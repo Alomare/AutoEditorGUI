@@ -258,7 +258,11 @@ export function baseName(path: string): string {
 
 export function dirName(path: string): string {
   const idx = Math.max(path.lastIndexOf('\\'), path.lastIndexOf('/'));
-  return idx > 0 ? path.slice(0, idx) : '';
+  if (idx < 0) return '';
+  if (idx === 0) return path[0]; // "/file"
+  const dir = path.slice(0, idx);
+  // Keep the root separator: a bare "C:" means "current folder on drive C".
+  return /^[A-Za-z]:$/.test(dir) ? dir + path[idx] : dir;
 }
 
 export function stemOf(path: string): string {

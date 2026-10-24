@@ -30,15 +30,19 @@
     if (!w.file && fileInputs.length) w.file = fileInputs[0].value;
   });
 
-  let outputPath = $derived.by(() => {
+  // Mic transcripts are named when the job starts, so two in a row don't
+  // overwrite each other; the preview shows the time the form last changed.
+  function pickOutput(now: number): string {
     if (w.destination === 'screen') return '';
     if (w.destination === 'custom') return w.customOutput;
     const ext = w.format === 'text' ? 'txt' : w.format;
-    if (w.source === 'mic') return joinPath(app.prefs.defaultOutputDir || app.videosDir, `transcript-${Date.now()}.${ext}`);
+    if (w.source === 'mic') return joinPath(app.prefs.defaultOutputDir || app.videosDir, `transcript-${now}.${ext}`);
     return w.file ? joinPath(dirName(w.file), `${stemOf(w.file)}.${ext}`) : '';
-  });
+  }
+  let outputPath = $derived(pickOutput(Date.now()));
+  let args = $derived(buildArgs(outputPath));
 
-  let args = $derived.by(() => {
+  function buildArgs(outputPath: string): string[] {
     const a = ['whisper', w.source === 'mic' ? ':mic' : w.file || 'input.mp4', w.model || 'model.bin'];
     if (!isParakeet && w.language && w.language !== 'auto') a.push('--language', w.language);
     a.push('--format', w.format);
@@ -51,7 +55,7 @@
     if (str(w.threshold)) a.push('--threshold', str(w.threshold));
     if (w.debug) a.push('--debug');
     return a;
-  });
+  }
 
   let problems = $derived.by(() => {
     const p: string[] = [];
@@ -68,14 +72,15 @@
 
   function start() {
     if (problems.length) return;
+    const output = pickOutput(Date.now());
     const [added] = queue.add([
       {
         kind: 'whisper',
         title: `Transcribe ${w.source === 'mic' ? 'microphone' : baseName(w.file)}`,
         program: app.autoEditor!.path,
-        args,
+        args: buildArgs(output),
         cwd: w.source === 'file' ? dirName(w.file) : app.prefs.defaultOutputDir || app.videosDir,
-        output: outputPath || undefined,
+        output: output || undefined,
       },
     ]);
     lastJob = added;

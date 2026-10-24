@@ -69,7 +69,9 @@ export const startJob = (
 export const stopJob = (id: string, graceful: boolean) => invoke<boolean>('stop_job', { id, graceful });
 
 export const latestRelease = (repo: string) => invoke<Release>('latest_release', { repo });
-export const downloadFile = (id: string, url: string, dest: string) => invoke<void>('download_file', { id, url, dest });
+/** `executable`: mark the file runnable (no-op on Windows). */
+export const downloadFile = (id: string, url: string, dest: string, executable = false) =>
+  invoke<void>('download_file', { id, url, dest, executable });
 export const cancelDownload = (id: string) => invoke<void>('cancel_download', { id });
 
 export interface JobOutputEvent {

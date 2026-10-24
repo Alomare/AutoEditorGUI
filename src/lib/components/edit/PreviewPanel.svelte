@@ -118,8 +118,23 @@
     return Math.min(1, v / max);
   }
 
+  /** Segments are in source order; binary search, since this runs for every
+   *  pixel of the graph and long files have thousands of clips. */
+  function segmentAt(frame: number) {
+    const segs = timeline?.segments ?? [];
+    let lo = 0;
+    let hi = segs.length - 1;
+    while (lo <= hi) {
+      const mid = (lo + hi) >> 1;
+      if (frame < segs[mid].from) hi = mid - 1;
+      else if (frame >= segs[mid].to) lo = mid + 1;
+      else return segs[mid];
+    }
+    return undefined;
+  }
+
   function stateAt(frame: number): 'cut' | 'keep' | 'speed' | 'fx' {
-    const seg = timeline?.segments.find((s) => frame >= s.from && frame < s.to);
+    const seg = segmentAt(frame);
     if (!seg) return 'cut';
     if (Math.abs(seg.speed - 1) > 1e-3) return 'speed';
     return seg.effects ? 'fx' : 'keep';

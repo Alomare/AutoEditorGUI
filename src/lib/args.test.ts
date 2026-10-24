@@ -11,7 +11,7 @@ import {
   renderArgs,
   splitArgs,
 } from './args';
-import { defaultSettings, method, step, uid, type EditSettings } from './model';
+import { defaultSettings, dirName, method, step, uid, type EditSettings } from './model';
 import { serializeChain, serializeEdit, serializeStep, thresholdToFraction } from './serialize';
 
 const settings = (patch: Partial<EditSettings> = {}): EditSettings => ({ ...defaultSettings(), ...patch });
@@ -153,6 +153,10 @@ describe('export and output', () => {
 
   it('adds the managed yt-dlp unless the user passed one', () => {
     expect(outputArgs(settings(), { ytdlpPath: 'C:\\app\\bin\\yt-dlp.exe' })).toEqual(['--yt-dlp-location', 'C:\\app\\bin\\yt-dlp.exe']);
+    const own = settings({ extraArgs: '--yt-dlp-location "D:\\tools\\yt-dlp.exe"' });
+    expect(renderArgs(own, ['https://x.y/v'], null, { ytdlpPath: 'C:\\app\\bin\\yt-dlp.exe' })).toEqual([
+      '--yt-dlp-location', 'D:\\tools\\yt-dlp.exe', '--', 'https://x.y/v',
+    ]);
   });
 
   it('only passes yt-dlp when an input is a URL', () => {
@@ -169,6 +173,15 @@ describe('export and output', () => {
     expect(outputPathFor(settings(), { id: '2', kind: 'url', value: 'https://x.y/v' }, 'D:\\out')).toBeNull();
     const mic = outputPathFor(settings(), { id: '3', kind: 'mic', value: ':mic' }, 'D:\\rec', new Date(2026, 9, 13, 9, 5, 7));
     expect(mic).toBe('D:\\rec\\recording-20261013-090507_ALTERED.wav');
+    expect(outputPathFor(settings(), { id: '4', kind: 'file', value: 'E:\\clip.mp4' }, '')).toBe('E:\\clip_ALTERED.mp4');
+  });
+
+  it('keeps the root when taking a folder name', () => {
+    expect(dirName('C:\\Videos\\talk.mov')).toBe('C:\\Videos');
+    expect(dirName('E:\\clip.mp4')).toBe('E:\\');
+    expect(dirName('/clip.mp4')).toBe('/');
+    expect(dirName('/home/me/clip.mp4')).toBe('/home/me');
+    expect(dirName('clip.mp4')).toBe('');
   });
 
   it('builds the preview command', () => {

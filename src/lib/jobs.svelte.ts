@@ -122,16 +122,22 @@ class JobQueue {
     }
     if (job.status !== 'running') return;
     const graceful = job.kind === 'record' || (job.kind === 'whisper' && job.args.includes(':mic'));
-    if (graceful) {
-      job.log.push('Stopping recording…');
-      await backend.stopJob(id, true);
-    } else {
-      await backend.stopJob(id, false);
+    try {
+      if (graceful) {
+        job.log.push('Stopping recording…');
+        if (!(await backend.stopJob(id, true)) && job.status === 'running') {
+          job.log.push("Couldn't send the stop signal. Use Discard to end it without saving.");
+        }
+      } else {
+        await backend.stopJob(id, false);
+      }
+    } catch (e) {
+      job.log.push(`Couldn't stop: ${backend.errorText(e)}`);
     }
   }
 
   async kill(id: string) {
-    await backend.stopJob(id, false);
+    await backend.stopJob(id, false).catch((e) => this.find(id)?.log.push(`Couldn't stop: ${backend.errorText(e)}`));
   }
 
   retry(id: string) {

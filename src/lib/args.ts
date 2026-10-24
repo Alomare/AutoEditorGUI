@@ -94,8 +94,8 @@ export function outputArgs(s: EditSettings, ctx: BuildContext = {}): string[] {
   const exp = exportValue(s);
   if (exp) a.push('--export', exp);
 
-  const extras = splitArgs(s.ytdlpExtras);
-  if (ctx.ytdlpPath && !extras.includes('--yt-dlp-location')) a.push('--yt-dlp-location', ctx.ytdlpPath);
+  // A location typed into the extra auto-editor arguments wins.
+  if (ctx.ytdlpPath && !splitArgs(s.extraArgs).includes('--yt-dlp-location')) a.push('--yt-dlp-location', ctx.ytdlpPath);
   if (str(s.ytdlpFormat)) a.push('--output-format', str(s.ytdlpFormat));
   if (str(s.ytdlpExtras)) a.push('--yt-dlp-extras', str(s.ytdlpExtras));
 

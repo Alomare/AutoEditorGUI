@@ -28,11 +28,12 @@ class Downloads {
     });
   }
 
-  async run(id: string, label: string, url: string, dest: string) {
+  async run(id: string, label: string, url: string, dest: string, executable = false) {
+    if (this.active[id]) throw new Error('This download is already in progress');
     this.active[id] = { label, received: 0, total: null };
     delete this.errors[id];
     try {
-      await backend.downloadFile(id, url, dest);
+      await backend.downloadFile(id, url, dest, executable);
     } catch (e) {
       this.errors[id] = backend.errorText(e);
       throw e;
@@ -99,7 +100,7 @@ export async function checkUpdate(tool: 'auto-editor' | 'yt-dlp'): Promise<Updat
 export async function installTool(tool: 'auto-editor' | 'yt-dlp', update?: UpdateInfo) {
   const u = update ?? (await checkUpdate(tool));
   const dest = joinPath(app.info!.paths.bin, exe(tool));
-  await downloads.run(tool, `${tool} ${u.latest}`, u.url, dest);
+  await downloads.run(tool, `${tool} ${u.latest}`, u.url, dest, true);
   if (tool === 'auto-editor') app.prefs.autoEditorPath = '';
   else app.prefs.ytdlpPath = '';
   await app.refreshTools();

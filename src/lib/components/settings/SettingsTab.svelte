@@ -68,7 +68,13 @@
   }
 
   async function deleteModel(f: FileEntry) {
-    await removeFile(f.path);
+    try {
+      await removeFile(f.path);
+    } catch (e) {
+      // e.g. a transcription is using it right now
+      app.notify(errorText(e), 'error');
+      return;
+    }
     if (app.whisper.model === f.path) app.whisper.model = '';
     await loadModels();
   }

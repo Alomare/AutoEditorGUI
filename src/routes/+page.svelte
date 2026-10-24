@@ -2,6 +2,7 @@
   import { onMount } from 'svelte';
   import { getCurrentWebview } from '@tauri-apps/api/webview';
   import { getCurrentWindow } from '@tauri-apps/api/window';
+  import { ask } from '@tauri-apps/plugin-dialog';
   import { Download, FolderOpen, Scissors, X } from '@lucide/svelte';
   import { errorText } from '$lib/backend';
   import EditTab from '$lib/components/edit/EditTab.svelte';
@@ -20,7 +21,27 @@
 
   onMount(() => {
     let unlisten: (() => void) | undefined;
+    let unlistenClose: (() => void) | undefined;
     (async () => {
+      // Closing kills running jobs (a recording would be lost) and must not
+      // drop a settings save that is still waiting on its debounce.
+      unlistenClose = await getCurrentWindow().onCloseRequested(async (e) => {
+        const running = queue.active;
+        if (running) {
+          const what = running.kind === 'record' ? 'A recording is in progress and will be lost' : `"${running.title}" is still running and will be stopped`;
+          const quit = await ask(`${what}${queue.pending > 1 ? `, and ${queue.pending - 1} queued job(s) won't run` : ''}. Quit anyway?`, {
+            title: 'Auto-Editor GUI',
+            kind: 'warning',
+            okLabel: 'Quit',
+            cancelLabel: 'Keep running',
+          }).catch(() => true);
+          if (!quit) {
+            e.preventDefault();
+            return;
+          }
+        }
+        await app.flushSave();
+      });
       try {
         await Promise.all([queue.init(), downloads.init()]);
         await app.load();
@@ -43,7 +64,10 @@
         }
       });
     })();
-    return () => unlisten?.();
+    return () => {
+      unlisten?.();
+      unlistenClose?.();
+    };
   });
 
   // Persist settings whenever they change.

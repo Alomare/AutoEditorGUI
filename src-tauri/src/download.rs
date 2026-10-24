@@ -2,7 +2,7 @@
 
 use std::collections::HashMap;
 use std::io::Write;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
@@ -75,13 +75,22 @@ pub async fn download_file(
     id: String,
     url: String,
     dest: String,
+    executable: Option<bool>,
 ) -> Result<(), String> {
     let cancel = Arc::new(AtomicBool::new(false));
-    downloads.active.lock().unwrap().insert(id.clone(), cancel.clone());
+    {
+        // Two downloads with one id would write the same `.part` file.
+        let mut active = downloads.active.lock().unwrap();
+        if active.contains_key(&id) {
+            return Err("This download is already in progress".into());
+        }
+        active.insert(id.clone(), cancel.clone());
+    }
+    let executable = executable.unwrap_or(false);
     // Retry transient failures (dropped connections, CDN hiccups).
     let mut result = Err(String::new());
     for attempt in 1..=3u64 {
-        result = download_inner(&app, &id, &url, PathBuf::from(&dest), &cancel).await;
+        result = download_inner(&app, &id, &url, PathBuf::from(&dest), executable, &cancel).await;
         if result.is_ok() || cancel.load(Ordering::SeqCst) {
             break;
         }
@@ -100,6 +109,7 @@ async fn download_inner(
     id: &str,
     url: &str,
     dest: PathBuf,
+    executable: bool,
     cancel: &AtomicBool,
 ) -> Result<(), String> {
     if let Some(parent) = dest.parent() {
@@ -150,11 +160,39 @@ async fn download_inner(
         return Err(format!("Download incomplete ({received} of {total} bytes)"));
     }
     let _ = app.emit("download-progress", DownloadProgress { id, received, total: Some(received) });
-    if dest.exists() {
-        std::fs::remove_file(&dest)
-            .map_err(|e| format!("Could not replace {}: {e}", dest.display()))?;
+    #[cfg(unix)]
+    if executable {
+        use std::os::unix::fs::PermissionsExt;
+        std::fs::set_permissions(&part, std::fs::Permissions::from_mode(0o755)).map_err(|e| e.to_string())?;
     }
-    std::fs::rename(&part, &dest).map_err(|e| e.to_string())?;
+    #[cfg(not(unix))]
+    let _ = executable;
+    replace_file(&part, &dest)
+}
+
+/// Move `part` over `dest`. Windows can't overwrite or delete an exe that is
+/// running (say, an `auto-editor info` still in flight), but it can rename
+/// it, so the old file is moved aside first and deleted once it's free.
+fn replace_file(part: &Path, dest: &Path) -> Result<(), String> {
+    let mut old = dest.as_os_str().to_owned();
+    old.push(".old");
+    let old = PathBuf::from(old);
+    let _ = std::fs::remove_file(&old);
+    let had_old = dest.exists();
+    if had_old && let Err(e) = std::fs::rename(dest, &old) {
+        let _ = std::fs::remove_file(part);
+        return Err(format!("Could not replace {}: {e}", dest.display()));
+    }
+    if let Err(e) = std::fs::rename(part, dest) {
+        if had_old {
+            let _ = std::fs::rename(&old, dest);
+        }
+        let _ = std::fs::remove_file(part);
+        return Err(format!("Could not replace {}: {e}", dest.display()));
+    }
+    // Fails harmlessly while the old copy is still running; the next
+    // replace removes it.
+    let _ = std::fs::remove_file(&old);
     Ok(())
 }
 

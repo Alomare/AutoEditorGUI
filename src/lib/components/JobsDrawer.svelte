@@ -55,8 +55,10 @@
 
   function copyCommand(j: Job) {
     const args = j.args.filter((a, i, all) => !(a === '--progress' || all[i - 1] === '--progress'));
-    navigator.clipboard.writeText(commandLine('auto-editor', args));
-    app.notify('Command copied', 'success');
+    navigator.clipboard.writeText(commandLine('auto-editor', args)).then(
+      () => app.notify('Command copied', 'success'),
+      () => app.notify("Couldn't copy to the clipboard", 'error'),
+    );
   }
 
   // Ticks the elapsed time while something runs.

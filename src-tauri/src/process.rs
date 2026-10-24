@@ -124,6 +124,7 @@ fn for_each_line(mut reader: impl Read, mut f: impl FnMut(String)) {
     };
     loop {
         match reader.read(&mut buf) {
+            Err(e) if e.kind() == std::io::ErrorKind::Interrupted => continue,
             Ok(0) | Err(_) => break,
             Ok(n) => {
                 for &b in &buf[..n] {
@@ -274,9 +275,15 @@ pub fn start_job(
     let stdout_thread = stdout.map(|out| {
         let (app, id) = (app.clone(), id.clone());
         std::thread::spawn(move || {
-            for line in BufReader::new(out).lines().map_while(Result::ok) {
-                let line = strip_ansi(&line);
+            // Decode lossily: stopping at a non-UTF-8 line would leave the pipe
+            // undrained, and the child would block once it fills up.
+            let mut reader = BufReader::new(out);
+            let mut buf = Vec::new();
+            while reader.read_until(b'\n', &mut buf).is_ok_and(|n| n > 0) {
+                let text = String::from_utf8_lossy(&buf);
+                let line = strip_ansi(text.trim_end_matches(['\r', '\n']));
                 let _ = app.emit("job-output", OutputEvent { id: &id, stream: "stdout", line });
+                buf.clear();
             }
         })
     });

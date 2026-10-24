@@ -49,7 +49,13 @@ const api =
     ? 'https://api.github.com/repos/WyattBlue/auto-editor/releases/latest'
     : `https://api.github.com/repos/WyattBlue/auto-editor/releases/tags/${aeVersion}`;
 const headers = { 'User-Agent': 'AutoEditorGUI-packager', Accept: 'application/vnd.github+json' };
-const release = await (await fetch(api, { headers })).json();
+const releaseRes = await fetch(api, { headers });
+if (!releaseRes.ok) {
+  // e.g. 403 when the unauthenticated API rate limit is used up
+  console.error(`GitHub API returned ${releaseRes.status} for ${api}`);
+  process.exit(1);
+}
+const release = await releaseRes.json();
 const a = release.assets?.find((x) => x.name === asset);
 if (!a) {
   console.error(`No ${asset} in auto-editor release ${release.tag_name ?? aeVersion}`);
