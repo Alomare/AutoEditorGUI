@@ -26,9 +26,9 @@ A license key (from [app.auto-editor.com](https://app.auto-editor.com)) is only 
 
 ## Download
 
-Get `AutoEditorGUI-<version>-windows-x64.zip` from the Releases page, unzip it anywhere, and run `AutoEditorGUI.exe`. It needs Windows 10 or 11 (the Microsoft Edge WebView2 runtime ships with both).
+Get `AutoEditorGUI-<version>-windows-x64-no-auto-editor.zip` from the [Releases page](https://github.com/Alomare/AutoEditorGUI/releases/latest), unzip it anywhere, and run `AutoEditorGUI.exe`. It needs Windows 10 or 11 (the Microsoft Edge WebView2 runtime ships with both).
 
-The zip includes auto-editor. The app can update auto-editor and download yt-dlp and transcription models from **Settings → Tools**.
+auto-editor isn't in the zip: on first start the app offers to download it (about 45 MB, FFmpeg included) from auto-editor's official releases, or you can point it to a copy you already have. The app can also update auto-editor and download yt-dlp and transcription models from **Settings → Tools**.
 
 ## Building from source
 
