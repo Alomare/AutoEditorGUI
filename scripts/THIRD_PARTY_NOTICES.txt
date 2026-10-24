@@ -1,22 +1,41 @@
-Third-party software in this package
-====================================
+Licensing of this package
+=========================
 
+AutoEditorGUI.exe
+  Auto-Editor GUI is released under the MIT License (LICENSE.txt). It contains
+  open-source libraries (Tauri, Svelte, Rust crates and others) that are under
+  their own permissive licenses; THIRD_PARTY_LICENSES.txt lists every one with
+  its license text and where to get its source code.
+
+[[auto-editor]]
 bin\auto-editor.exe  (auto-editor {{AE_VERSION}})
-  Unmodified release binary from https://github.com/WyattBlue/auto-editor/releases
-  auto-editor's source code is released into the public domain under the
-  Unlicense (https://unlicense.org). The binary statically links FFmpeg and
-  other libraries (for example codec and transcription libraries), which are
-  covered by their own open-source licenses (such as LGPL/GPL). See the
-  auto-editor repository for the exact components, their licenses and the
-  build scripts used to produce the binary.
+  A separate program. Auto-Editor GUI starts it as a command-line tool and
+  doesn't link with it, so the MIT License above does not cover it, and its
+  license does not extend to Auto-Editor GUI.
 
-AutoEditorGUI.exe is built with these open-source libraries, among others:
-  Tauri (MIT or Apache-2.0)          https://tauri.app
-  Svelte / SvelteKit (MIT)           https://svelte.dev
-  Lucide icons (ISC)                 https://lucide.dev
-  reqwest, serde, tokio and other Rust crates (MIT or Apache-2.0)
+  It is the unmodified Windows release binary from
+    https://github.com/WyattBlue/auto-editor/releases/tag/{{AE_VERSION}}
+  auto-editor's own code is in the public domain (Unlicense). The binary also
+  statically links FFmpeg and other libraries, including the GPL-licensed x264
+  and x265 encoders, so the binary as a whole is distributed under the GNU
+  General Public License, version 2 or later. A copy of the GPL is in
+  bin\auto-editor.GPL-2.0.txt.
 
-Downloaded on request (not included in this package):
+  Corresponding source code: auto-editor's source and the build scripts used to
+  make this binary are at
+    https://github.com/WyattBlue/auto-editor/tree/{{AE_VERSION}}
+  and the sources of the libraries they build are available from their
+  projects (https://ffmpeg.org, https://code.videolan.org/videolan/x264,
+  https://bitbucket.org/multicoreware/x265_git and the others named in those
+  build scripts).
+
+  You may delete bin\auto-editor.exe; the app can download auto-editor again
+  from Settings > Tools.
+
+[[/auto-editor]]
+Downloaded on request, straight from their publishers
+  auto-editor (code: Unlicense; Windows binaries: GPL-2.0-or-later)
+                                     https://github.com/WyattBlue/auto-editor
   yt-dlp (Unlicense)                 https://github.com/yt-dlp/yt-dlp
   whisper.cpp ggml models (MIT)      https://huggingface.co/ggerganov/whisper.cpp
   Parakeet TDT models (CC-BY-4.0)    https://huggingface.co/ggml-org/parakeet-GGUF

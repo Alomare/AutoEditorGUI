@@ -7,6 +7,12 @@ const host = process.env.TAURI_DEV_HOST;
 export default defineConfig(() => ({
   plugins: [sveltekit()],
 
+  // Licenses of the npm packages bundled into the UI; scripts/licenses.mjs
+  // turns this into the release's THIRD_PARTY_LICENSES.txt.
+  build: {
+    license: { fileName: '.vite/licenses.json' },
+  },
+
   // Vite options tailored for Tauri development and only applied in `tauri dev` or `tauri build`
   //
   // 1. prevent Vite from obscuring rust errors
