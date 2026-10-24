@@ -2,9 +2,9 @@
 
 A portable desktop app for [auto-editor](https://github.com/WyattBlue/auto-editor): cut silence, dead air and motionless parts out of videos and audio — and use every other auto-editor feature — without the command line.
 
-- **Portable.** One folder, no installer, no Python. Unzip and run `AutoEditorGUI.exe`. Settings, presets, tools and models stay in that folder.
-- **Straightforward.** Drop files in, pick a preset or adjust three settings, press Render. A live preview shows exactly what will be cut before you render.
-- **Complete.** Every auto-editor 31.x option, action and subcommand is reachable, and anything newer can be passed as extra arguments.
+- **Portable:** Unzip and run `AutoEditorGUI.exe`. Settings, presets, tools and models stay in that folder.
+- **Straightforward:** Drop files in, pick a preset or adjust three settings, press Render. A live preview shows exactly what will be cut before you render.
+- **Complete:** Every auto-editor 31.x option, action and subcommand is reachable, and anything newer can be passed as extra arguments.
 
 ## Features
 
